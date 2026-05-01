@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
@@ -11,9 +13,12 @@ from security import hash_password, verify_password, create_access_token
 app = FastAPI()
 
 
-@app.on_event("startup")
-def on_startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     init_db()
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.post("/register", response_model=UserResponse)
@@ -47,8 +52,3 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: 
 
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
-
-
-@app.get("/")
-async def root():
-    return {"message": "Hello, World!"}
