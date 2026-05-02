@@ -1,5 +1,4 @@
 from sqlmodel import SQLModel, Field
-from typing import Optional
 from pydantic import EmailStr
 import uuid
 from uuid import UUID
@@ -14,7 +13,8 @@ class User(SQLModel, table=True):
 
     id: UUID = Field(default_factory=uuid.uuid4,
                      primary_key=True, nullable=False)
-    email: EmailStr = Field(unique=True)
+    email: EmailStr = Field(unique=True, max_length=255,
+                            index=True, nullable=False)
     first_name: str
     last_name: str
     hashed_password: str

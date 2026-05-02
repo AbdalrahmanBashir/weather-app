@@ -1,11 +1,26 @@
 from sqlmodel import Session, create_engine, SQLModel
 import os
+from sqlalchemy.engine import URL
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
 
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith(
-    "sqlite") else {}
-engine = create_engine(DATABASE_URL, echo=True, connect_args=connect_args)
+SERVER = "A3BASHIR"
+DATABASE = "Test10DB"
+
+connection_url = URL.create(
+    "mssql+pyodbc",
+    host=SERVER,
+    database=DATABASE,
+    query={
+        "driver": "ODBC Driver 17 for SQL Server",
+        "trusted_connection": "yes",
+        "TrustServerCertificate": "yes",
+        "Encrypt": "no",
+    },
+)
+
+DATABASE_URL = os.getenv("DATABASE_URL", str(connection_url))
+
+engine = create_engine(DATABASE_URL, echo=True)
 
 
 def init_db():
