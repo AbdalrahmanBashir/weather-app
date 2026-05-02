@@ -1,5 +1,5 @@
-# Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,database
-# Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,python,database
+# Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,database,dotenv
+# Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,python,database,dotenv
 
 ### Database ###
 *.accdb
@@ -10,6 +10,9 @@
 *.sqlite3
 *.db-shm
 *.db-wal
+
+### dotenv ###
+.env
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
@@ -134,7 +137,6 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
 .venv
 env/
 venv/
@@ -202,4 +204,4 @@ pyrightconfig.json
 .history
 .ionide
 
-# End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,database
+# End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,python,database,dotenv
