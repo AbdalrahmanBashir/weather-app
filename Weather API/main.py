@@ -73,7 +73,8 @@ async def get_weather(request: WeatherRequest):
     """
     Get the weather information of a city.
     The weather information will be cached for 1 hour to reduce the number of API calls to the openweathermap API.
-    If the weather information of the city is in the cache, it will be returned from the cache. Otherwise, it will be fetched from the openweathermap API and then cached for future requests.
+    If the weather information of the city is in the cache, it will be returned from the cache. 
+    Otherwise, it will be fetched from the openweathermap API and then cached for future requests.
     The response will include the weather information and the source of the data (cache or API).
     """
     city_name = request.city.strip().lower()
