@@ -35,6 +35,14 @@ class WeatherRequest(BaseModel):
 # create a route to get the weather information of a city
 
 
+@app.get("/health")
+async def health_check():
+    result = redis_client.ping()
+    if not result:
+        raise HTTPException(status_code=500, detail="Redis is not healthy")
+    return {"status": "healthy"}
+
+
 @app.post("/weather")
 async def get_weather(request: WeatherRequest):
     # check if the weather information of the city is in the cache
