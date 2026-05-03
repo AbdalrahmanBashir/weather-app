@@ -4,3 +4,5 @@ pydantic==2.13.3
 requests==2.31.0
 redis==7.4.0
 python-dotenv==1.0.0
+httpx==0.28.1
+prometheus-client==0.19.0
