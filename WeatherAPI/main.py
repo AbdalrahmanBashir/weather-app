@@ -108,48 +108,43 @@ async def prometheus_middleware(request: Request, call_next):
     method = request.method
     endpoint = normalize_endpoint(request.url.path)
     start_time = time.perf_counter()
-    status_code = "500"  # Default for exceptions
+
+    status_code = "500"
 
     try:
         response = await call_next(request)
         status_code = str(response.status_code)
+
         return response
-    except Exception as exc:
-        # Count exceptions as 500 errors
-        http_request_total.labels(
-            method=method,
-            endpoint=endpoint,
-            status_code=status_code,
-        ).inc()
-        http_request_duration_seconds.labels(
-            method=method,
-            endpoint=endpoint,
-        ).observe(time.perf_counter() - start_time)
+
+    except Exception:
         http_errors_total.labels(
             method=method,
             endpoint=endpoint,
             status_code=status_code,
         ).inc()
-        raise exc
+        raise
+
     finally:
-        # Success path metrics already counted in except if failed, so only count if not already counted as an error
-        if status_code not in ["500"]:
-            duration = time.perf_counter() - start_time
-            http_request_total.labels(
+        duration = time.perf_counter() - start_time
+
+        http_request_total.labels(
+            method=method,
+            endpoint=endpoint,
+            status_code=status_code,
+        ).inc()
+
+        http_request_duration_seconds.labels(
+            method=method,
+            endpoint=endpoint,
+        ).observe(duration)
+
+        if status_code.startswith(("4", "5")):
+            http_errors_total.labels(
                 method=method,
                 endpoint=endpoint,
                 status_code=status_code,
             ).inc()
-            http_request_duration_seconds.labels(
-                method=method,
-                endpoint=endpoint,
-            ).observe(duration)
-            if status_code.startswith("4") or status_code.startswith("5"):
-                http_errors_total.labels(
-                    method=method,
-                    endpoint=endpoint,
-                    status_code=status_code
-                ).inc()
 
 # create a route to expose the prometheus metrics
 
