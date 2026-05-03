@@ -103,20 +103,19 @@ def normalize_endpoint(path: str) -> str:
 @app.middleware("http")
 async def prometheus_middleware(request: Request, call_next):
     if request.url.path == "/metrics":
-        # Skip metrics endpoint to avoid recursion
         return await call_next(request)
+
     method = request.method
     endpoint = normalize_endpoint(request.url.path)
     start_time = time.perf_counter()
-    status_code = 500  # Default to 500 in case of unhandled exceptions
+    status_code = "500"  # Default for exceptions
+
     try:
         response = await call_next(request)
         status_code = str(response.status_code)
         return response
-    except Exception:
-        raise
-    finally:
-        duration = time.perf_counter() - start_time
+    except Exception as exc:
+        # Count exceptions as 500 errors
         http_request_total.labels(
             method=method,
             endpoint=endpoint,
@@ -125,13 +124,32 @@ async def prometheus_middleware(request: Request, call_next):
         http_request_duration_seconds.labels(
             method=method,
             endpoint=endpoint,
-        ).observe(duration)
-        if status_code.startswith("4") or status_code.startswith("5"):
-            http_errors_total.labels(
+        ).observe(time.perf_counter() - start_time)
+        http_errors_total.labels(
+            method=method,
+            endpoint=endpoint,
+            status_code=status_code,
+        ).inc()
+        raise exc
+    finally:
+        # Success path metrics already counted in except if failed, so only count if not already counted as an error
+        if status_code not in ["500"]:
+            duration = time.perf_counter() - start_time
+            http_request_total.labels(
                 method=method,
                 endpoint=endpoint,
                 status_code=status_code,
             ).inc()
+            http_request_duration_seconds.labels(
+                method=method,
+                endpoint=endpoint,
+            ).observe(duration)
+            if status_code.startswith("4") or status_code.startswith("5"):
+                http_errors_total.labels(
+                    method=method,
+                    endpoint=endpoint,
+                    status_code=status_code
+                ).inc()
 
 # create a route to expose the prometheus metrics
 
@@ -177,7 +195,7 @@ async def readiness_check():
 
 
 @app.post("/weather")
-async def get_weather(request: WeatherRequest):
+async def get_weather(weather_request: WeatherRequest, request: Request):
     """
     Get the weather information of a city.
     The weather information will be cached for 1 hour to reduce the number of API calls to the openweathermap API.
@@ -185,7 +203,7 @@ async def get_weather(request: WeatherRequest):
     Otherwise, it will be fetched from the openweathermap API and then cached for future requests.
     The response will include the weather information and the source of the data (cache or API).
     """
-    city_name = request.city.strip().lower()
+    city_name = weather_request.city.strip().lower()
     api_key = os.getenv("OPENWEATHERMAP_API_KEY")
     if not api_key:
         raise HTTPException(
