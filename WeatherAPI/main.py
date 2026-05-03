@@ -110,11 +110,11 @@ async def prometheus_middleware(request: Request, call_next):
     start_time = time.perf_counter()
 
     status_code = "500"
+    error_counted = False
 
     try:
         response = await call_next(request)
         status_code = str(response.status_code)
-
         return response
 
     except Exception:
@@ -123,6 +123,7 @@ async def prometheus_middleware(request: Request, call_next):
             endpoint=endpoint,
             status_code=status_code,
         ).inc()
+        error_counted = True
         raise
 
     finally:
@@ -139,7 +140,8 @@ async def prometheus_middleware(request: Request, call_next):
             endpoint=endpoint,
         ).observe(duration)
 
-        if status_code.startswith(("4", "5")):
+        # Only count error once
+        if not error_counted and status_code.startswith(("4", "5")):
             http_errors_total.labels(
                 method=method,
                 endpoint=endpoint,
