@@ -7,12 +7,15 @@
 # To reduce the number of API calls to the openweathermap API.
 
 # imprt the necessary libraries
+from unittest import result
+
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 import requests
 import redis
 import os
 from dotenv import load_dotenv
+import json
 
 # Load env from project root
 load_dotenv()
@@ -21,7 +24,9 @@ load_dotenv()
 redis_client = redis.Redis(
     host=os.getenv('REDIS_HOST', 'localhost'),
     port=int(os.getenv('REDIS_PORT', 6379)),
-    db=int(os.getenv('REDIS_DB', 0)))
+    db=int(os.getenv('REDIS_DB', 0)),
+    decode_responses=True
+)
 
 # create a fastapi app
 app = FastAPI()
@@ -35,33 +40,55 @@ class WeatherRequest(BaseModel):
 # create a route to get the weather information of a city
 
 
-@app.get("/health")
-async def health_check():
-    result = redis_client.ping()
-    if not result:
-        raise HTTPException(status_code=500, detail="Redis is not healthy")
-    return {"status": "healthy"}
+@app.get("/health/ready")
+async def readiness_check():
+    try:
+        if redis_client.ping():
+            return {"status": "ready"}
+    except Exception:
+        raise HTTPException(
+            status_code=503, detail="Redis unreachable")
 
 
 @app.post("/weather")
 async def get_weather(request: WeatherRequest):
+
+    city_name = request.city.strip().lower()
+    api_key = os.getenv("OPENWEATHERMAP_API_KEY")
     # check if the weather information of the city is in the cache
-    cached_weather = redis_client.get(request.city)
-    if cached_weather:
-        return {"weather": cached_weather.decode("utf-8"), "source": "cache"}
+    cached_data = redis_client.get(city_name)
+    if cached_data:
+        return {"weather": json.loads(cached_data), "source": "cache"}
+
+    # Get coordinates from city name
+    geo_url = f"http://api.openweathermap.org/geo/1.0/direct?q={city_name}&limit=1&appid={api_key}"
+    geo_response = requests.get(geo_url)
+    if geo_response.status_code != 200:
+        raise HTTPException(status_code=404, detail="City not found")
+
+    geo_data = geo_response.json()
+    if not geo_data:
+        raise HTTPException(status_code=404, detail="City not found")
+
+    lat = geo_data[0]['lat']
+    lon = geo_data[0]['lon']
 
     # if not in cache, get the weather information from the openweathermap API
-    api_key = os.getenv("OPENWEATHERMAP_API_KEY")
-    url = f"http://api.openweathermap.org/data/2.5/weather?q={request.city}&appid={api_key}"
+    url = f"http://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}&units=metric"
     response = requests.get(url)
     if response.status_code != 200:
         raise HTTPException(status_code=404, detail="City not found")
 
     weather_data = response.json()
-    print(weather_data)
-    weather_info = f"{weather_data['weather'][0]['description']}, {weather_data['main']['temp']}K"
+    city_info = geo_data[0]
+    weather_info = {
+        "description": weather_data['weather'][0]['description'],
+        "temperature": f"{weather_data['main']['temp']}°C",
+        "humidity": f"{weather_data['main']['humidity']}%",
+        "city_full_name": f"{city_info['name']}, {city_info['country']}"
+    }
 
     # cache the weather information for 1 hour
-    redis_client.setex(request.city, 3600, weather_info)
+    redis_client.setex(city_name, 3600, json.dumps(weather_info))
 
     return {"weather": weather_info, "source": "API"}
