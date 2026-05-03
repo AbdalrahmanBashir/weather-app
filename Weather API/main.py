@@ -7,7 +7,6 @@
 # To reduce the number of API calls to the openweathermap API.
 
 # imprt the necessary libraries
-from unittest import result
 
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
@@ -37,22 +36,46 @@ app = FastAPI()
 class WeatherRequest(BaseModel):
     city: str
 
-# create a route to get the weather information of a city
+# Health check endpoints
+
+
+@app.get("/health/live")
+async def liveness_check():
+    """
+    Liveness Probe: Tells K8s if the app is alive. 
+    If this fails, K8s will restart the container.
+    """
+    return {"status": "alive"}
 
 
 @app.get("/health/ready")
 async def readiness_check():
+    """
+    Readiness Probe: Tells K8s if the app is ready to serve traffic.
+    If this fails, K8s will stop sending traffic to the container until it passes.
+    """
     try:
-        if redis_client.ping():
-            return {"status": "ready"}
-    except Exception:
+        if not redis_client.ping():
+            raise Exception("Redis ping failed")
+    except Exception as e:
         raise HTTPException(
-            status_code=503, detail="Redis unreachable")
+            status_code=503, detail=f"Redis unreachable: {str(e)}")
+    if not os.getenv("OPENWEATHERMAP_API_KEY"):
+        raise HTTPException(
+            status_code=503, detail="OpenWeatherMap API key not set")
+    return {"status": "ready"}
+
+# create a route to get the weather information of a city
 
 
 @app.post("/weather")
 async def get_weather(request: WeatherRequest):
-
+    """
+    Get the weather information of a city.
+    The weather information will be cached for 1 hour to reduce the number of API calls to the openweathermap API.
+    If the weather information of the city is in the cache, it will be returned from the cache. Otherwise, it will be fetched from the openweathermap API and then cached for future requests.
+    The response will include the weather information and the source of the data (cache or API).
+    """
     city_name = request.city.strip().lower()
     api_key = os.getenv("OPENWEATHERMAP_API_KEY")
     # check if the weather information of the city is in the cache
