@@ -1,0 +1,48 @@
+groups:
+  - name: weatherapp-alerts
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          (
+            rate(http_errors_total{endpoint="/weather"}[5m]) 
+            / 
+            rate(http_requests_total{endpoint="/weather"}[5m]) 
+          ) > 0.1
+        for: 2m
+        labels:
+          severity: "critical"
+        annotations:
+          summary: "High error rate on /weather endpoint"
+          description: "More than 10% of requests failing"
+
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{endpoint="/weather"}[5m])) by (le)
+          ) > 1
+        for: 2m
+        labels:
+          severity: "warning"
+        annotations:
+          summary: "High latency detected"
+          description: "P95 latency > 1s"
+
+      - alert: RedisDown
+        expr: |
+          rate(redis_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: "warning"
+        annotations:
+          summary: "Redis failures detected"
+          description: "Redis is unreachable"
+
+      - alert: OpenWeatherDown
+        expr: |
+          rate(openweather_weather_api_errors_total[5m]) > 0.2
+        for: 2m
+        labels:
+          severity: "warning"
+        annotations:
+          summary: "OpenWeather API failing"
+          description: "External weather API is failing"

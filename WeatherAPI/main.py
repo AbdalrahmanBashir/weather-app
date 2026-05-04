@@ -14,7 +14,7 @@ import os
 from dotenv import load_dotenv
 import json
 import time
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from starlette.responses import Response
 import httpx
 from contextlib import asynccontextmanager
@@ -84,6 +84,7 @@ redis_failures_total = Counter(
     "redis_failures_total",
     "Redis connectivity failures"
 )
+
 
 # create a pydantic model for the request body
 
